@@ -416,6 +416,19 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     heartbeatPromptChars: renderedPrompt.length,
   };
 
+  // Resolve MCP config paths: check global (~/.claude/mcp.json) then project-level (cwd/.mcp.json).
+  const mcpConfigPaths: string[] = [];
+  const globalMcpConfig = path.join(os.homedir(), ".claude", "mcp.json");
+  const projectMcpConfig = path.join(cwd, ".mcp.json");
+  for (const mcpPath of [globalMcpConfig, projectMcpConfig]) {
+    try {
+      await fs.access(mcpPath);
+      mcpConfigPaths.push(mcpPath);
+    } catch {
+      // File doesn't exist — skip
+    }
+  }
+
   const buildClaudeArgs = (resumeSessionId: string | null) => {
     const args = ["--print", "-", "--output-format", "stream-json", "--verbose"];
     if (resumeSessionId) args.push("--resume", resumeSessionId);
@@ -428,6 +441,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       args.push("--append-system-prompt-file", effectiveInstructionsFilePath);
     }
     args.push("--add-dir", skillsDir);
+    for (const mcpPath of mcpConfigPaths) {
+      args.push("--mcp-config", mcpPath);
+    }
     if (extraArgs.length > 0) args.push(...extraArgs);
     return args;
   };
