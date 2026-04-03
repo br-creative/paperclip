@@ -55,8 +55,24 @@ ARG USER_GID=1000
 WORKDIR /app
 COPY --chown=node:node --from=build /app /app
 RUN npm install --global --omit=dev @anthropic-ai/claude-code@latest @openai/codex@latest opencode-ai \
-  && mkdir -p /paperclip \
-  && chown node:node /paperclip
+  && mkdir -p /paperclip/.claude \
+  && chown -R node:node /paperclip
+
+# Global MCP config so all Claude Code agents get Figma tools regardless of cwd.
+# FIGMA_ACCESS_TOKEN is substituted at runtime by Claude Code's ${ENV_VAR} syntax.
+COPY --chown=node:node <<'EOF' /paperclip/.claude/mcp.json
+{
+  "mcpServers": {
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/sse",
+      "headers": {
+        "X-Figma-Token": "${FIGMA_ACCESS_TOKEN}"
+      }
+    }
+  }
+}
+EOF
 
 COPY scripts/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
